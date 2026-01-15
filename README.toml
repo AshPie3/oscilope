@@ -1,0 +1,8 @@
+First I need to figure out how to take in stere output divide it into left and right
+
+Then from each signal I need to convert it to a value based on its frequency and amplitude 
+
+Then I need to visualize that with a dot which moves along the x and y asis using the two
+channel values as input
+
+This dot has to leave a trail that lasts a certain amount
