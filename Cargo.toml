@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-winit = "0.30.12"
+anyhow = "1.0.100"
+cpal = "0.17.1"
+ringbuf = "0.4.8"
+ruhear = "0.1.1"

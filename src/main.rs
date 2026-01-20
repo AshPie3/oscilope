@@ -1,41 +1,65 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use anyhow::Result;
-use std::sync::{Arc, Mutex};
+use core::f32;
+use std::{borrow::Borrow, ops::Div, sync::{Arc, Mutex}, time::Duration};
 use ruhear::{rucallback, RUBuffers, RUHear};
-use std::thread;
+use std::sync::mpsc;
 
-fn main() -> Result<()> {
-    //Set up device
-    //let host = cpal::default_host();
-    //let device = host.default_input_device().expect("failed to find input device");
-    // Set up config
-    //let config: cpal::StreamConfig = device.default_input_config()?.into();
-    // Set up input stream
-    //let input_stream = device.build_input_stream(&config, parse_stream, err_fn, None)?;
-    // Main loop
-    println!("Starting input stream ");
-    // ruhear capture audio output
-    let callback = |audio_buffers: RUBuffers| {
-        parse_stream(audio_buffers.clone());
+
+#[derive(Clone)]
+struct Buffer {
+    x: Vec<f32>,
+    y: Vec<f32>,
+}
+
+
+fn main() {
+    let mut buffer = Buffer{
+        x: vec![],
+        y: vec![],
     };
+
+    let (tx, rx) = mpsc::channel();
+    let callback = move |audio_buffers: RUBuffers| {
+        //buffer = parse_stream(audio_buffers);
+        //buffer.x.push(audio_buffers[0].pop().expect("Not possible"));
+        //buffer.y.push(audio_buffers[1].pop().expect("Not possible"));
+        //parse_stream(audio_buffers.clone());
+        tx.send(audio_buffers);
+    };
+
+
     let callback = rucallback!(callback);
     let mut ruhear = RUHear::new(callback);
+    
 
-    ruhear.start();
-    std::thread::sleep(std::time::Duration::from_secs(100));
-    ruhear.stop();
+    //ruhear.start();
+    //std::thread::sleep(std::time::Duration::from_secs_f32(1.0));
+    //ruhear.stop();
+    loop {
+        ruhear.start();
+        buffer.x = rx.recv().unwrap()[0].clone();
+        println!("X: {:?}", buffer.x.last());
 
-    Ok(())
+        buffer.y = rx.recv().unwrap()[1].clone();
+        println!("Y: {:?}", buffer.y.last());
+    }
+    //ruhear.start();
+    //std::thread::sleep(std::time::Duration::from_secs_f32(10.0));
+    //ruhear.stop(); 
+
 }
 
-fn err_fn(err: cpal::StreamError) {
-    eprintln!("an error occurred on stream: {err}");
-}
 
-fn parse_stream(data: Vec<Vec<f32>>) {
-    println!("Samples: {:?}", data[0].len());
+fn parse_stream(data: Vec<Vec<f32>>) -> Buffer {
+    println!("Samples: {:?}", &data[0].len());
+    let mut buff = Buffer {x: vec![], y: vec![]};
+    let value = data.clone();
+        for element in &value {
+        buff.x.push(element[0]);
+        //println!("X: {:?}", buffer.x.last());
+        buff.y.push(element[1]);
+        }
     println!("Value Channel 0: {:?}", data[0].last());
     println!("Value Channel 1: {:?}", data[1].last());
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    buff
 }
 
