@@ -1,5 +1,5 @@
 use core::f32;
-use std::{borrow::Borrow, ops::Div, sync::{Arc, Mutex}, time::Duration};
+use std::sync::{Arc, Mutex};
 use ruhear::{rucallback, RUBuffers, RUHear};
 use std::sync::mpsc;
 
@@ -19,10 +19,6 @@ fn main() {
 
     let (tx, rx) = mpsc::channel();
     let callback = move |audio_buffers: RUBuffers| {
-        //buffer = parse_stream(audio_buffers);
-        //buffer.x.push(audio_buffers[0].pop().expect("Not possible"));
-        //buffer.y.push(audio_buffers[1].pop().expect("Not possible"));
-        //parse_stream(audio_buffers.clone());
         tx.send(audio_buffers);
     };
 
@@ -31,16 +27,11 @@ fn main() {
     let mut ruhear = RUHear::new(callback);
     
 
-    //ruhear.start();
-    //std::thread::sleep(std::time::Duration::from_secs_f32(1.0));
-    //ruhear.stop();
     loop {
         ruhear.start();
         buffer.x = rx.recv().unwrap()[0].clone();
-        println!("X: {:?}", buffer.x.last());
-
         buffer.y = rx.recv().unwrap()[1].clone();
-        println!("Y: {:?}", buffer.y.last());
+        show_raw(buffer.clone());
     }
     //ruhear.start();
     //std::thread::sleep(std::time::Duration::from_secs_f32(10.0));
@@ -62,4 +53,8 @@ fn parse_stream(data: Vec<Vec<f32>>) -> Buffer {
     println!("Value Channel 1: {:?}", data[1].last());
     buff
 }
-
+fn show_raw(buffer: Buffer) {
+    println!("X: {:?}, Samples: {:?}", buffer.x.last(), buffer.x.len());
+    println!("Y: {:?}, Samples: {:?}", buffer.y.last(), buffer.y.len());
+    print!("{}[2J", 27 as char);
+}
