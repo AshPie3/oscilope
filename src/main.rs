@@ -1,4 +1,4 @@
-use core::f32;}}
+use core::f32;
 use std::{iter, sync::{Arc, Mutex}, usize};
 use ruhear::{rucallback, RUBuffers, RUHear};
 use std::sync::mpsc;
@@ -76,6 +76,16 @@ impl State {
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
+        Ok(Self {
+            surface,
+            device,
+            queue,
+            config,
+            is_surface_configured: false,
+            window,
+        })
+
+    }
 
         pub fn resize(&mut self, width: u32, height: u32) {
             if width > 0 && height > 0 {
@@ -85,19 +95,59 @@ impl State {
             self.is_surface_configured = true;
             }
         }
+        // Here all the keyboard events are configured
+        fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
+            match (code, is_pressed) {
+                (KeyCode::Escape, true) => event_loop.exit(),
+                _ => {}
+            }
+        }
+        fn update(&mut self) {
+            // remove `todo!()`
+        }
+        fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+            self.window.request_redraw();
+            if !self.is_surface_configured {
+                return Ok(());
+            }
+            let output = self.surface.get_current_texture()?; 
+            
+            let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        Ok(Self {
-            surface,
-            device,
-            queue,
-            config,
-            is_surface_configured: false,
-            window,
-        })
+            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+            { // <- drops the encoder so encoder.finish() can be called later
+            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            // Loads a color
+                            r: 0.1,
+                            g: 0.8,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
+            }
+
+            // submit will accept anything that implements IntoIter
+            self.queue.submit(std::iter::once(encoder.finish()));
+            output.present();
+            Ok(())
     }
 }
-
-
 pub struct App {
     #[cfg(target_arch = "wasm32")]
     proxy: Option<winit::event_loop::EventLoopProxy<State>>,
@@ -177,8 +227,12 @@ impl ApplicationHandler<State> for App {
         self.state = Some(event);
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: winit::window::WindowId, event: WindowEvent) {
-    let state = match &mut self.state {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: winit::window::WindowId, 
+        event: WindowEvent) {
+        let state = match &mut self.state {
             Some(canvas) => canvas,
             None => return,
         };
@@ -187,7 +241,18 @@ impl ApplicationHandler<State> for App {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => state.resize(size.width, size.height),
             WindowEvent::RedrawRequested => {
-                state.render();
+                state.update();
+                match state.render() {
+                    Ok(_) => {}
+                    // Reconfigure the surface if it's lost or outdated
+                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                        let size = state.window.inner_size();
+                        state.resize(size.width, size.height);
+                    }
+                    Err(e) => {
+                        log::error!("Unable to render {}", e);
+                    }
+                }
             }
             WindowEvent::KeyboardInput {
                 event:
@@ -197,10 +262,7 @@ impl ApplicationHandler<State> for App {
                         ..
                     },
                 ..
-            } => match (code, key_state.is_pressed()) {
-                (KeyCode::Escape, true) => event_loop.exit(),
-                _ => {}
-            },
+            } => state.handle_key(event_loop, code, key_state.is_pressed()),
             _ => {}
         }
     } 
@@ -267,6 +329,7 @@ fn main() {
     let callback = rucallback!(callback);
     let mut ruhear = RUHear::new(callback);
     ruhear.start();
+    run();
     loop {
         buffer.samples = rx.recv().unwrap()[0].len() as i32;            
         buffer.x = parse_samples(rx.recv().unwrap()[0].clone(), buffer.samples, opt.sampling, opt.volume);
