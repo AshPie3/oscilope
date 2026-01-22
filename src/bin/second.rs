@@ -1,7 +1,8 @@
 use std::f32;
 use std::{sync::{Arc, Mutex}, usize};
+use raylib::color::Color;
 use ruhear::{rucallback, RUBuffers, RUHear};
-use raylib::ffi::Color;
+use raylib::ffi::Color as OtherColor;
 use std::sync::mpsc;
 use raylib::prelude::*;
 use std::collections::VecDeque;
@@ -24,14 +25,14 @@ pub struct Opt {
 
 }
 static opt: Opt = Opt{
-        sampling: 1000,
-        decay: 0.7,
-        latency: 0,
-        volume: 400.0,
-        max_size: false,
-        screen_width: 640,// raylib::window::get_monitor_width(),
-        screen_height: 640,
-    };
+    sampling: 1000,
+    decay: 1.8,
+    latency: 0,
+    volume: 400.0,
+    max_size: false,
+    screen_width: 640,// raylib::window::get_monitor_width(),
+    screen_height: 640,
+};
 
 fn main() {
     let mut buffer = Buffer{
@@ -65,14 +66,14 @@ fn main() {
         buffer.samples = rx.recv().unwrap()[0].len() as i32;            
         buffer.x = parse_samples(rx.recv().unwrap()[0].clone(), buffer.samples, opt.sampling, opt.volume, opt.screen_width, opt.max_size);
         buffer.y = parse_samples(rx.recv().unwrap()[1].clone(), buffer.samples, opt.sampling, opt.volume, opt.screen_height, opt.max_size);
-        //let mut top_item = Vector2 {x: buffer.x.pop().unwrap(), y: buffer.y.pop().unwrap()};
-        //d.draw_circle_v(top_item, point_radius, ball_color);
+        let mut top_item = Vector2 {x: buffer.x.pop().unwrap(), y: buffer.y.pop().unwrap()};
         d.clear_background(Color {
             r: 10,
             g: 10,
             b: 10,
             a: 255,
         });
+        d.draw_circle_v(top_item, point_radius, Color::BLUE);
         for i in 1..opt.sampling as usize-1 {
             show_raw(buffer.clone());
             let ratio = 1.0 - (opt.sampling as f32 - i as f32) / (opt.sampling as f32 * opt.decay);
@@ -80,17 +81,11 @@ fn main() {
             trail_color.r = (ball_color.b as f32 * ratio) as u8;
             trail_color.g = (ball_color.g as f32 * ratio) as u8;
             trail_color.b = (ball_color.b as f32 * ratio) as u8;
-            let : (f32, f32) = buffer.x.pop()
             let next_item = Vector2 {x: buffer.x.pop().unwrap(), y: buffer.y.pop().unwrap()};
-            let mut behind_item: Vector2;
-            if buffer.x.last() != None{
-                //behind_item = Vector2 {x: buffer.x.pop().unwrap(), y: buffer.y.pop().unwrap()};//deque.pop_front().unwrap();
+            d.draw_circle_v(next_item, point_radius, trail_color);
+            d.draw_line_ex(next_item, top_item, point_radius, trail_color);
+            top_item = next_item;
 
-            } else {
-                behind_item = next_item;
-
-            }
-               d.draw_circle_v(next_item, point_radius, trail_color);
                 
         };
     }
