@@ -8,6 +8,10 @@ edition = "2024"
 name = "second"
 path = "src/bin/second.rs"
 
+[[bin]]
+name = "third"
+path = "src/bin/cpal_test.rs"
+
 [dependencies]
 cpal = "0.17.1"
 ruhear = "0.1.1"
@@ -18,3 +22,5 @@ log = "0.4"
 wgpu = "28.0"
 pollster = "0.3"
 raylib = "5.5.1"
+macroquad = "0.4.14"
+ringbuf = "0.4.8"
